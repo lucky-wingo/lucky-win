@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lucky Wheel - Ultra Reliable</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; padding: 0;
+            background: #000; color: #fff;
+            font-family: 'Kanit', sans-serif;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden;
+        }
+
+        h1 { 
+            margin-bottom: 20px; color: #ffff00; 
+            text-shadow: 0 0 15px #ffcc00, 2px 2px #000; 
+            font-size: 2.2rem; text-align: center;
+        }
+
+        .wheel-wrapper {
+            position: relative;
+            width: 92vw; max-width: 450px;
+            aspect-ratio: 1/1;
+        }
+
+        .pointer {
+            position: absolute; top: -25px; left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 45px solid #ff0000;
+            z-index: 30;
+            filter: drop-shadow(0 4px 8px #000);
+        }
+
+        canvas {
+            width: 100%; height: 100%;
+            border-radius: 50%; border: 10px solid #fff;
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-spin {
+            margin-top: 40px;
+            padding: 15px 80px;
+            font-size: 2.2rem; font-weight: 900;
+            color: #000;
+            background: linear-gradient(180deg, #00ff00, #00cc00);
+            border: 4px solid #fff; border-radius: 60px;
+            cursor: pointer; box-shadow: 0 8px #006600;
+            transition: 0.1s;
+        }
+
+        .btn-spin:disabled {
+            background: #444; color: #888;
+            border-color: #555; box-shadow: none;
+            transform: none;
+        }
+
+        #status {
+            margin-top: 20px; font-size: 1.8rem;
+            font-weight: bold; color: #00ffff;
+            text-shadow: 2px 2px 4px #000; text-align: center;
+            min-height: 40px;
+        }
+
+        .already-played {
+            display: none; color: #ff4d4d;
+            font-size: 1.2rem; margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <h1>💎 ลุ้นเหรียญทองฟรี 💎</h1>
+
+    <div class="wheel-wrapper">
+        <div class="pointer"></div>
+        <canvas id="wheelCanvas" width="800" height="800"></canvas>
+    </div>
+
+    <div id="status">เตรียมรับโชคใหญ่!</div>
+
+    <button class="btn-spin" id="spinBtn">หมุนเลย!</button>
+    <div id="msgPlayed" class="already-played">คุณใช้สิทธิ์ไปแล้ว ไม่สามารถหมุนซ้ำได้</div>
+
+    <script>
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        const statusText = document.getElementById('status');
+        const msgPlayed = document.getElementById('msgPlayed');
+
+        const prizes = [
+            { label: "20", color: "#ff3333" }, 
+            { label: "30", color: "#00ccff" }, 
+            { label: "40", color: "#ff00cc" }, 
+            { label: "50", color: "#33ff33" }, 
+            { label: "100", color: "#9933ff" }, 
+            { label: "150", color: "#ffcc00" }, 
+            { label: "เสียใจด้วย", color: "#222222" }
+        ];
+
+        const numPrizes = prizes.length;
+        const arc = (2 * Math.PI) / numPrizes;
+        let rotation = 0;
+        let isSpinning = false;
+
+        // --- ระบบเสียง ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTick() {
+            const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+            o.frequency.setValueAtTime(600,audioCtx.currentTime);
+            o.frequency.exponentialRampToValueAtTime(10,audioCtx.currentTime+0.1);
+            g.gain.setValueAtTime(0.1,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime+0.1);
+        }
+        function playFail() {
+            const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+            o.type='sawtooth'; o.frequency.setValueAtTime(150,audioCtx.currentTime);
+            o.frequency.linearRampToValueAtTime(70,audioCtx.currentTime+0.5);
+            g.gain.setValueAtTime(0.2,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime+0.5);
+        }
+
+        // --- เริ่มต้นวาดทันที ---
+        window.onload = () => {
+            if (localStorage.getItem('wheelPlayed')) setPlayedState();
+            drawWheel();
+        };
+
+        function setPlayedState() {
+            spinBtn.disabled = true;
+            spinBtn.innerText = "สิทธิ์หมดแล้ว";
+            spinBtn.style.background = "#333";
+            msgPlayed.style.display = "block";
+            statusText.innerText = "เสียใจด้วย! คุณหมุนไปแล้ว";
+            statusText.style.color = "#ff4d4d";
+        }
+
+        function drawWheel() {
+            const radius = canvas.width / 2;
+            ctx.clearRect(0,0,800,800);
+            ctx.save(); ctx.translate(radius,radius); ctx.rotate(rotation); ctx.translate(-radius,-radius);
+            
+            prizes.forEach((p, i) => {
+                const a = i * arc;
+                ctx.beginPath(); ctx.fillStyle = p.color; ctx.moveTo(radius,radius);
+                ctx.arc(radius,radius,radius,a,a+arc); ctx.fill();
+                ctx.strokeStyle="#fff"; ctx.lineWidth=4; ctx.stroke();
+                
+                ctx.save(); 
+                ctx.translate(radius,radius); 
+                ctx.rotate(a+arc/2);
+                ctx.textAlign="right"; 
+                ctx.fillStyle="#fff"; 
+                ctx.font="bold 60px Kanit"; 
+                ctx.shadowBlur=8; ctx.shadowColor="#000";
+
+                if (p.label !== "เสียใจด้วย") {
+                    // ใช้ Emoji แทนรูปภาพ เพื่อความรวดเร็วและแน่นอน
+                    ctx.fillText(p.label + " 💰", radius - 50, 22); 
+                } else {
+                    ctx.fillText(p.label, radius - 60, 22);
+                }
+                ctx.restore();
+            });
+            ctx.restore();
+            
+            // วาดจุดกึ่งกลาง
+            ctx.beginPath();
+            const grad=ctx.createRadialGradient(radius,radius,10,radius,radius,85);
+            grad.addColorStop(0,'#fff3b0'); grad.addColorStop(1,'#d4af37');
+            ctx.fillStyle=grad; ctx.arc(radius,radius,85,0,Math.PI*2); ctx.fill();
+            ctx.strokeStyle="#fff"; ctx.lineWidth=6; ctx.stroke();
+            ctx.fillStyle="#000"; ctx.textAlign="center"; ctx.font="bold 40px Kanit";
+            ctx.fillText("LUCKY",radius,radius+15);
+        }
+
+        function spin() {
+            if (isSpinning || localStorage.getItem('wheelPlayed')) return;
+            isSpinning = true;
+            spinBtn.disabled = true;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            statusText.innerText = "กำลังหมุน... ลุ้นยาวๆ!";
+            statusText.style.color = "#ffff00";
+
+            const targetIndex = 6; 
+            const degPerSlice = 360 / numPrizes;
+            const totalRotations = 20; 
+            const targetDeg = (360 * totalRotations) + (360 - (targetIndex * degPerSlice) - 15 + 270) % 360;
+            const targetRad = targetDeg * (Math.PI / 180);
+            
+            let start = null;
+            let lastTick = -1;
+            const duration = 10000; 
+
+            function animate(now) {
+                if (!start) start = now;
+                const progress = now - start;
+                const fraction = Math.min(progress / duration, 1);
+                const easeOut = 1 - Math.pow(1 - fraction, 3);
+                rotation = targetRad * easeOut;
+
+                const curTick = Math.floor((rotation*180/Math.PI) / degPerSlice);
+                if (curTick !== lastTick) { playTick(); lastTick = curTick; }
+
+                drawWheel();
+                
+                if (progress < duration) {
+                    requestAnimationFrame(animate);
+                } else {
+                    isSpinning = false;
+                    playFail();
+                    localStorage.setItem('wheelPlayed', 'true');
+                    setTimeout(() => {
+                        setPlayedState();
+                        alert("เสียใจด้วย! คุณไม่ได้รับรางวัลในรอบนี้");
+                    }, 500);
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        spinBtn.addEventListener('click', spin);
+    </script>
+</body>
+</html>
