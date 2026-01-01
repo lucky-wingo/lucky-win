@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lucky Wheel - Ultra Reliable</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; padding: 20px 0; /* เพิ่ม padding บนล่างนิดหน่อย */
+            background: #000; color: #fff;
+            font-family: 'Kanit', sans-serif;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: 100vh; overflow-x: hidden; /* ป้องกันสกรอลแนวนอน */
+        }
+
+        h1 { 
+            margin-bottom: 10px; color: #ffff00; /* ลด margin-bottom */
+            text-shadow: 0 0 15px #ffcc00, 2px 2px #000; 
+            font-size: 2rem; text-align: center; /* ลดขนาดฟอนต์หัวข้อลงเล็กน้อย */
+        }
+
+        /* --- ส่วนของตัวการ์ตูน CSS --- */
+        .mascot-container {
+            position: relative;
+            width: 100px; height: 100px;
+            margin-bottom: -20px; /* ให้ซ้อนทับวงล้อนิดหน่อย */
+            z-index: 20; /* อยู่เหนือวงล้อ แต่อยู่ใต้ Pointer */
+        }
+
+        .mascot-body {
+            width: 100%; height: 100%;
+            background: radial-gradient(circle at 30% 30%, #ffd700, #ffaa00);
+            border-radius: 50% 50% 45% 45%; /* รูปทรงหยดน้ำ/สไลม์ */
+            box-shadow: 0 5px 15px rgba(255, 170, 0, 0.5) inset, 0 10px 20px rgba(0,0,0,0.5);
+            position: relative;
+            animation: bounceMascot 1.5s infinite ease-in-out;
+            display: flex; justify-content: center; align-items: center;
+            flex-direction: column;
+        }
+
+        /* ตา */
+        .mascot-eyes {
+            display: flex; gap: 15px; margin-top: -10px;
+        }
+        .eye {
+            width: 18px; height: 22px; background: #fff;
+            border-radius: 50%; position: relative;
+        }
+        .eye::after { /* ลูกตาดำ */
+            content: ''; position: absolute;
+            width: 10px; height: 10px; background: #000;
+            border-radius: 50%; top: 5px; left: 4px;
+        }
+
+        /* ปาก */
+        .mascot-mouth {
+            width: 30px; height: 15px;
+            border-bottom: 4px solid #333;
+            border-radius: 0 0 15px 15px;
+            margin-top: 5px;
+        }
+        
+        /* แก้มแดง */
+        .mascot-cheeks {
+            position: absolute; top: 55%; width: 100%;
+            display: flex; justify-content: space-between; padding: 0 5px;
+        }
+        .cheek {
+            width: 15px; height: 8px; background: #ff5555; 
+            border-radius: 50%; opacity: 0.6;
+        }
+
+        /* อนิเมชั่นกระโดด */
+        @keyframes bounceMascot {
+            0%, 100% { transform: translateY(0) scale(1, 1); }
+            50% { transform: translateY(-25px) scale(1.05, 0.95); } /* กระโดดขึ้นและยืดตัวนิดหน่อย */
+            55% { transform: translateY(-25px) scale(0.95, 1.05); } /* หดตัวตอนอยู่จุดสูงสุด */
+            95% { transform: translateY(0) scale(1.1, 0.9); } /* แบนลงตอนตกถึงพื้น */
+        }
+        /* --------------------------- */
+
+
+        .wheel-wrapper {
+            position: relative;
+            width: 90vw; max-width: 420px; /* ปรับขนาดลงเล็กน้อยเพื่อให้สมดุลกับตัวการ์ตูน */
+            aspect-ratio: 1/1;
+            margin-top: 10px;
+        }
+
+        .pointer {
+            position: absolute; top: -25px; left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 45px solid #ff0000;
+            z-index: 30;
+            filter: drop-shadow(0 4px 8px #000);
+        }
+
+        canvas {
+            width: 100%; height: 100%;
+            border-radius: 50%; border: 8px solid #fff; /* ลดขอบเหลือ 8px */
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-spin {
+            margin-top: 30px; /* ลด margin */
+            padding: 15px 80px;
+            font-size: 2rem; font-weight: 900; /* ลดขนาดฟอนต์ปุ่ม */
+            color: #000;
+            background: linear-gradient(180deg, #00ff00, #00cc00);
+            border: 4px solid #fff; border-radius: 60px;
+            cursor: pointer; box-shadow: 0 8px #006600;
+            transition: 0.1s;
+        }
+
+        .btn-spin:disabled {
+            background: #444; color: #888;
+            border-color: #555; box-shadow: none;
+            transform: none;
+        }
+
+        #status {
+            margin-top: 20px; font-size: 1.6rem; /* ลดขนาดฟอนต์สถานะ */
+            font-weight: bold; color: #00ffff;
+            text-shadow: 2px 2px 4px #000; text-align: center;
+            min-height: 30px;
+        }
+
+        .already-played {
+            display: none; color: #ff4d4d;
+            font-size: 1.2rem; margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <h1>💎 ลุ้นเหรียญทองฟรี 💎</h1>
+
+    <div class="mascot-container">
+        <div class="mascot-body">
+            <div class="mascot-eyes">
+                <div class="eye left"></div>
+                <div class="eye right"></div>
+            </div>
+            <div class="mascot-cheeks">
+                <div class="cheek"></div>
+                <div class="cheek"></div>
+            </div>
+            <div class="mascot-mouth"></div>
+        </div>
+    </div>
+    <div class="wheel-wrapper">
+        <div class="pointer"></div>
+        <canvas id="wheelCanvas" width="800" height="800"></canvas>
+    </div>
+
+    <div id="status">เตรียมรับโชคใหญ่!</div>
+
+    <button class="btn-spin" id="spinBtn">หมุนเลย!</button>
+    <div id="msgPlayed" class="already-played">คุณใช้สิทธิ์ไปแล้ว ไม่สามารถหมุนซ้ำได้</div>
+
+    <script>
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        const statusText = document.getElementById('status');
+        const msgPlayed = document.getElementById('msgPlayed');
+
+        const prizes = [
+            { label: "100", color: "#ff3333" }, 
+            { label: "500", color: "#00ccff" }, 
+            { label: "1000", color: "#ff00cc" }, 
+            { label: "3000", color: "#33ff33" }, 
+            { label: "5000", color: "#9933ff" }, 
+            { label: "10000", color: "#ffcc00" }, 
+            { label: "เสียใจด้วย", color: "#222222" }
+        ];
+
+        const numPrizes = prizes.length;
+        const arc = (2 * Math.PI) / numPrizes;
+        let rotation = 0;
+        let isSpinning = false;
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTick() {
+            const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+            o.frequency.setValueAtTime(600,audioCtx.currentTime);
+            o.frequency.exponentialRampToValueAtTime(10,audioCtx.currentTime+0.1);
+            g.gain.setValueAtTime(0.1,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime+0.1);
+        }
+        function playFail() {
+            const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+            o.type='sawtooth'; o.frequency.setValueAtTime(150,audioCtx.currentTime);
+            o.frequency.linearRampToValueAtTime(70,audioCtx.currentTime+0.5);
+            g.gain.setValueAtTime(0.2,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime+0.5);
+        }
+
+        window.onload = () => {
+            if (localStorage.getItem('wheelPlayed')) setPlayedState();
+            drawWheel();
+        };
+
+        function setPlayedState() {
+            spinBtn.disabled = true;
+            spinBtn.innerText = "สิทธิ์หมดแล้ว";
+            spinBtn.style.background = "#333";
+            msgPlayed.style.display = "block";
+            statusText.innerText = "เสียใจด้วย! คุณหมุนไปแล้ว";
+            statusText.style.color = "#ff4d4d";
+        }
+
+        function drawWheel() {
+            const radius = canvas.width / 2;
+            ctx.clearRect(0,0,800,800);
+            ctx.save(); ctx.translate(radius,radius); ctx.rotate(rotation); ctx.translate(-radius,-radius);
+            
+            prizes.forEach((p, i) => {
+                const a = i * arc;
+                ctx.beginPath(); ctx.fillStyle = p.color; ctx.moveTo(radius,radius);
+                ctx.arc(radius,radius,radius,a,a+arc); ctx.fill();
+                ctx.strokeStyle="#fff"; ctx.lineWidth=4; ctx.stroke();
+                
+                ctx.save(); 
+                ctx.translate(radius,radius); 
+                ctx.rotate(a+arc/2);
+                ctx.textAlign="right"; 
+                ctx.fillStyle="#fff"; 
+                // --- ใช้ขนาดฟอนต์ 40px จากรอบที่แล้ว ---
+                ctx.font="bold 40px Kanit"; 
+                ctx.shadowBlur=8; ctx.shadowColor="#000";
+
+                if (p.label !== "เสียใจด้วย") {
+                    ctx.fillText(p.label + " 💰", radius - 50, 15); 
+                } else {
+                    ctx.fillText(p.label, radius - 60, 15);
+                }
+                ctx.restore();
+            });
+            ctx.restore();
+            
+            ctx.beginPath();
+            const grad=ctx.createRadialGradient(radius,radius,10,radius,radius,85);
+            grad.addColorStop(0,'#fff3b0'); grad.addColorStop(1,'#d4af37');
+            ctx.fillStyle=grad; ctx.arc(radius,radius,85,0,Math.PI*2); ctx.fill();
+            ctx.strokeStyle="#fff"; ctx.lineWidth=6; ctx.stroke();
+            ctx.fillStyle="#000"; ctx.textAlign="center"; ctx.font="bold 40px Kanit";
+            ctx.fillText("LUCKY",radius,radius+15);
+        }
+
+        function spin() {
+            if (isSpinning || localStorage.getItem('wheelPlayed')) return;
+            isSpinning = true;
+            spinBtn.disabled = true;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            statusText.innerText = "กำลังหมุน... ลุ้นยาวๆ!";
+            statusText.style.color = "#ffff00";
+
+            const targetIndex = 6; 
+            const degPerSlice = 360 / numPrizes;
+            const totalRotations = 10; 
+            const targetDeg = (360 * totalRotations) + (360 - (targetIndex * degPerSlice) - (degPerSlice/2) + 270) % 360;
+            const targetRad = targetDeg * (Math.PI / 180);
+            
+            let start = null;
+            let lastTick = -1;
+            const duration = 6000; 
+
+            function animate(now) {
+                if (!start) start = now;
+                const progress = now - start;
+                const fraction = Math.min(progress / duration, 1);
+                const easeOut = 1 - Math.pow(1 - fraction, 3);
+                rotation = targetRad * easeOut;
+
+                const curTick = Math.floor((rotation*180/Math.PI) / degPerSlice);
+                if (curTick !== lastTick) { playTick(); lastTick = curTick; }
+
+                drawWheel();
+                
+                if (progress < duration) {
+                    requestAnimationFrame(animate);
+                } else {
+                    isSpinning = false;
+                    playFail();
+                    localStorage.setItem('wheelPlayed', 'true');
+                    setTimeout(() => {
+                        setPlayedState();
+                        alert("เสียใจด้วย! คุณไม่ได้รับรางวัลในรอบนี้");
+                    }, 500);
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        spinBtn.addEventListener('click', spin);
+    </script>
+</body>
+</html>
